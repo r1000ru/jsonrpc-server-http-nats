@@ -93,7 +93,7 @@
 
 ```javascript
 // Подключаем модуль
-const JsonRPCServer = require('jsonrpc-server');
+const JsonRPCServer = require('jsonrpc-server-http-nats');
 
 // Создаем экземпляр сервера
 var server = new JsonRPCServer();
