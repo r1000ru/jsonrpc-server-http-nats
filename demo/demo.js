@@ -39,4 +39,4 @@ server.on('ItIsNotWork', (params, response)=>{
 
 // Запустим сервер
 server.listenHttp();
-server.listenNats('nats://192.168.100.10:4222', 'TestChannel');
+server.listenNats('nats://127.0.0.1:4222', 'TestChannel');
