@@ -55,7 +55,7 @@ Server.prototype._onRequest = function(request, response) {
     // Загружаем тело
     this._getRequestBody(request, (input)=>{
         // Вызываем внешний обработчки
-        this.onRequest(input, 'http', (output)=>{
+        this.onRequest(input, null, (output)=>{
             // Отправляем ответ
             this._send(response, output);
         });
