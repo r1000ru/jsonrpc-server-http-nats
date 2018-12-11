@@ -6,7 +6,7 @@
     "directories": {},
     "repository": {
         "type": "git",
-        "url": "https://github.com/r1000ru/jsonrpc-server.git"
+        "url": "https://github.com/r1000ru/jsonrpc-server-http-nats.git"
     },
     "scripts": {
         "demo": "node ./demo/demo.js"
