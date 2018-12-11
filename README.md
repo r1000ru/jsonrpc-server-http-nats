@@ -88,7 +88,7 @@
 
 ### Пример
 
-1. Установите пакет сервера: `npm install git+https://gitlab.tecel.ru/NodeLibs/jsonrpc-server.git --save`
+1. Установите пакет сервера: `npm install jsonrpc-server-http-nats --save`
 1. Напишите код:
 
 ```javascript
