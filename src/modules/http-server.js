@@ -82,6 +82,7 @@ Server.prototype._getRequestBody = function(request, callback) {
  * Метод отправляет ответ на запрос
  */
 Server.prototype._send = function(response, content) {
+    content = content || '';
     let headers = Object.assign({}, this._headers, {
         "Content-Type": "application/json",
         "Content-Length": Buffer.from(content).byteLength
