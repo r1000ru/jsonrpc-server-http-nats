@@ -2,6 +2,7 @@ const http = require('http');
 
 var Server = function(server) {
     this._server = server || http.createServer();
+    this._credential = null;
 
     this._headers = {
         "Access-Control-Allow-Origin": "*",
@@ -55,7 +56,7 @@ Server.prototype._onRequest = function(request, response) {
     // Загружаем тело
     this._getRequestBody(request, (input)=>{
         // Вызываем внешний обработчки
-        this.onRequest(input, null, (output)=>{
+        this.onRequest(input, null, request.headers['X-Credential'] || null, (output)=>{
             // Отправляем ответ
             this._send(response, output);
         });

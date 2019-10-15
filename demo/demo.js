@@ -22,7 +22,7 @@ var validator = function(param) {
 
 server.on('Hello', validator, (params, channel, response) => {
     let error = null;
-    let result = `Hello ${params} on channel ${channel}!`;
+    let result = `Hello ${params} on channel ${channel||'HTTP'}!`;
     response(error, result);
 });
 
@@ -39,4 +39,4 @@ server.on('ItIsNotWork', (params, response)=>{
 
 // Запустим сервер
 server.listenHttp();
-server.listenNats('nats://127.0.0.1:4222', 'TestChannel');
+//server.listenNats('nats://127.0.0.1:4222', 'TestChannel');

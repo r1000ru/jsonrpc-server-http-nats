@@ -6,16 +6,16 @@ const errors = require('./modules/jsonrpc-errors'),
 var Server = function(httpServer) {
     
     this._methods = {};
-
+    this._credential = {};
     this._http = new HttpServer(httpServer);
     this._nats = new NatsServer();
     
-    this._http.onRequest = (input, channel, callback) => {
-        this._onRequest(input, channel, callback);
+    this._http.onRequest = (input, channel, credential, callback) => {
+        this._onRequest(input, channel, credential, callback);
     }
 
     this._nats.onRequest = (input, channel, callback) => {
-        this._onRequest(input, channel, callback);
+        this._onRequest(input, channel, this._credential, callback);
     }
 }
 
@@ -48,6 +48,8 @@ Server.prototype.on = function(method, validator, callback) {
  * @param callback Функция в которую при запуске сервера будет передана ошибка или undefined, если запуск прошел успешно
  */
 Server.prototype.listenHttp = function(options, callback) {
+    options = options || {};
+    this._credential = options.credential || null;
     this._http.listen(options, callback);
 };
 
@@ -91,9 +93,15 @@ Server.prototype._checkParams = function(method, params) {
     return clearedParams;
 }
 
-Server.prototype._onRequest = function(content, channel, callback) {
+Server.prototype._onRequest = function(content, channel, credential, callback) {
     jsonrpc.parse(content, (errorResponse, id, method, params)=>{
         if (errorResponse) {
+            callback(errorResponse);
+            return;
+        }
+
+        if (this._credential && this._credential !== credential) {
+            errorResponse = jsonrpc.create(id, errors.SERVICE_FORBIDDEN);
             callback(errorResponse);
             return;
         }
