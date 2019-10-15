@@ -94,7 +94,6 @@ Server.prototype._checkParams = function(method, params) {
 }
 
 Server.prototype._onRequest = function(content, channel, credential, callback) {
-    console.log(channel, credential)
     jsonrpc.parse(content, (errorResponse, id, method, params)=>{
         if (errorResponse) {
             callback(errorResponse);
