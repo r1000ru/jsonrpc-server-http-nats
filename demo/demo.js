@@ -38,5 +38,5 @@ server.on('ItIsNotWork', (params, response)=>{
 
 
 // Запустим сервер
-server.listenHttp();
+server.listenHttp({credential: 'ABCD'});
 //server.listenNats('nats://127.0.0.1:4222', 'TestChannel');

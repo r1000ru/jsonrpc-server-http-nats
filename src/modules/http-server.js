@@ -56,7 +56,8 @@ Server.prototype._onRequest = function(request, response) {
     // Загружаем тело
     this._getRequestBody(request, (input)=>{
         // Вызываем внешний обработчки
-        this.onRequest(input, null, request.headers['X-Credential'] || null, (output)=>{
+        console.log(request.headers)
+        this.onRequest(input, null, request.headers['x-credential'] || null, (output)=>{
             // Отправляем ответ
             this._send(response, output);
         });
