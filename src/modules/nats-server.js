@@ -38,9 +38,13 @@ NatsServer.prototype.listen = function(options, channel, callback) {
             url: options
         }
     }
+    try {
+        this._server.close();
+    } catch(e) {
+
+    }
     
     this._server = NATS.connect(options);
-
     this._server.on('connect', ()=>{
         this.addChannel(channel, callback)
     });

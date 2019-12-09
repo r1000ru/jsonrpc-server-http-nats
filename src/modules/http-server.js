@@ -40,6 +40,12 @@ Server.prototype.listen = function(options, callback) {
     options.host = options.host || '127.0.0.1';
     options.port = options.port || 8080;
 
+    if (this._server.listening) {
+        this._server.close(()=>{
+            this._server.listen(options, callback);
+        });
+        return;
+    }
     this._server.listen(options, callback);
 }
 
