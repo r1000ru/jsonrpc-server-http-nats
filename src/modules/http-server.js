@@ -62,6 +62,7 @@ Server.prototype._onRequest = function(request, response) {
     // Загружаем тело
     this._getRequestBody(request, (input)=>{
         // Вызываем внешний обработчки
+        request.headers['x-forwarded-for'] = request.headers['x-forwarded-for'] || request.connection.remoteAddress;
         this.onRequest(input, null, request.headers, (output)=>{
             // Отправляем ответ
             this._send(response, output);
