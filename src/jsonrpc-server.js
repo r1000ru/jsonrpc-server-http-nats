@@ -10,12 +10,12 @@ var Server = function(httpServer) {
     this._http = new HttpServer(httpServer);
     this._nats = new NatsServer();
     
-    this._http.onRequest = (input, channel, credential, callback) => {
-        this._onRequest(input, channel, credential, callback);
+    this._http.onRequest = (input, channel, headers, callback) => {
+        this._onRequest(input, channel, headers, callback);
     }
 
     this._nats.onRequest = (input, channel, callback) => {
-        this._onRequest(input, channel, this._credential, callback);
+        this._onRequest(input, channel, null, callback);
     }
 }
 
@@ -93,14 +93,14 @@ Server.prototype._checkParams = function(method, params) {
     return clearedParams;
 }
 
-Server.prototype._onRequest = function(content, channel, credential, callback) {
+Server.prototype._onRequest = function(content, channel, headers, callback) {
     jsonrpc.parse(content, (errorResponse, id, method, params)=>{
         if (errorResponse) {
             callback(errorResponse);
             return;
         }
 
-        if (this._credential && this._credential !== credential) {
+        if (!channel && this._credential && (!headers || !headers['x-credential'] || headers['x-credential'] !==  this._credential)) {
             errorResponse = jsonrpc.create(id, errors.SERVICE_FORBIDDEN);
             callback(errorResponse);
             return;
@@ -149,6 +149,17 @@ Server.prototype._onRequest = function(content, channel, credential, callback) {
                     break;
                 case 3:
                     this._methods[method].func(clearedParams, channel, (error, result)=>{
+                        if (error) {
+                            errorResponse = jsonrpc.create(id, error);
+                            callback(errorResponse);
+                            return;
+                        }
+    
+                        callback(jsonrpc.create(id, undefined, result));
+                    });
+                    break; 
+                case 4:
+                    this._methods[method].func(clearedParams, channel, headers, (error, result)=>{
                         if (error) {
                             errorResponse = jsonrpc.create(id, error);
                             callback(errorResponse);
