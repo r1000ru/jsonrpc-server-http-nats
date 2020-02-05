@@ -1,6 +1,6 @@
 {
     "name": "jsonrpc-server-http-nats",
-    "version": "0.1.11",
+    "version": "0.1.12",
     "description": "HTTP Server for JSON-RPC protocol other HTTP and Nats",
     "main": "./src/jsonrpc-server.js",
     "directories": {},

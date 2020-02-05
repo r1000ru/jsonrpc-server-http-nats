@@ -56,8 +56,8 @@ Server.prototype.listenHttp = function(options, callback) {
 /**
  * Метод запускает прием запросов из Nats
  */
-Server.prototype.listenNats = function(options, channel, callback) {
-    this._nats.listen(options, channel, callback);
+Server.prototype.listenNats = function(options, channel, onConnect, onError) {
+    this._nats.listen(options, channel, onConnect, onError);
 }
 
 /**
