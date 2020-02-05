@@ -32,7 +32,7 @@ NatsServer.prototype.addChannel = function(channel, callback) {
 
 }
 
-NatsServer.prototype.listen = function(options, channel, callback) {
+NatsServer.prototype.listen = function(options, channel, onStart, onError) {
     if (typeof(options) === 'string') {
         options = {
             url: options
@@ -46,8 +46,14 @@ NatsServer.prototype.listen = function(options, channel, callback) {
     
     this._server = NATS.connect(options);
     this._server.on('connect', ()=>{
-        this.addChannel(channel, callback)
+        this.addChannel(channel, onStart)
     });
+
+    if (onError) {
+        this._server.on('error', (e)=>{
+            onError(e);
+        })
+    }
     
 }
 
