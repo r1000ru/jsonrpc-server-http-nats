@@ -94,8 +94,12 @@ Server.prototype._send = function(response, content) {
     let headers = Object.assign({}, this._headers, {
         "Content-Type": "application/json",
         "Content-Length": Buffer.from(content).byteLength
-    })
-    response.writeHead(200, headers);
+    });
+    for (let header in headers) {
+        response.setHeader(header, headers[header]);
+    }
+    
+    response.writeHead(200);
     response.end(content);
 }
 
