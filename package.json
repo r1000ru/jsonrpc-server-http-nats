@@ -1,6 +1,6 @@
 {
     "name": "jsonrpc-server-http-nats",
-    "version": "0.1.14",
+    "version": "1.0.0-rc1",
     "description": "HTTP Server for JSON-RPC protocol other HTTP and Nats",
     "main": "./src/jsonrpc-server.js",
     "directories": {},
@@ -14,6 +14,6 @@
     "author": "Roman Sorokin <mail@r1000.ru>",
     "license": "MIT",
     "dependencies": {
-        "nats": "^0.8.10"
+        "nats": "2.15.1"
     }
 }
