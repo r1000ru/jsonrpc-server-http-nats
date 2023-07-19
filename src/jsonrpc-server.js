@@ -1,189 +1,142 @@
 const errors = require('./modules/jsonrpc-errors'),
-    HttpServer = require('./modules/http-server'),
-    NatsServer = require('./modules/nats-server'),
     jsonrpc = require('./modules/jsonrpc');
 
-var Server = function(httpServer) {
-    
-    this._methods = {};
-    this._credential = {};
-    this._http = new HttpServer(httpServer);
-    this._nats = new NatsServer();
-    
-    this._http.onRequest = (input, channel, headers, callback) => {
-        this._onRequest(input, channel, headers, callback);
+const ServerHTTP = require('./modules/server-http'),
+    ServerNats = require('./modules/server-nats');
+
+class JsonRPCServer {
+    constructor() {
+        this._methods = new Map();
+        this._credential = false;
+        this._server_nats = null;
+        this._server_http = null;
     }
 
-    this._nats.onRequest = (input, channel, callback) => {
-        this._onRequest(input, channel, null, callback);
-    }
-}
-
-/**
- * Метод навешивает реакцию на метод JSONRPC
- * 
- * @param {string} event Метод
- * @param {object} validator Функция, которая валидирует переданные параметры, типа function(inputParams, (error, checkedParams)=>{}), не обязательно
- * @param {function} callback Функция, для обработки метода, типа function(checkedParams, (error, response)=>{})
- */
-Server.prototype.on = function(method, validator, callback) {
-    if (!callback) {
-        callback = validator;
-        validator = function(params) {
-            return params;
-        };
-    };
-
-    this._methods[method] = {
-        func: callback,
-        validator: validator
-    };
-};
-
-/**
- * Метод запускает прием запросов на HTTP сервер
- * 
- * @param options Объект настройки http сервера
- * @param server Экземпляр http сервера, не обязательный параметр
- * @param callback Функция в которую при запуске сервера будет передана ошибка или undefined, если запуск прошел успешно
- */
-Server.prototype.listenHttp = function(options, callback) {
-    options = options || {};
-    this._credential = options.credential || null;
-    this._http.listen(options, callback);
-};
-
-/**
- * Метод запускает прием запросов из Nats
- */
-Server.prototype.listenNats = function(options, channel, onConnect, onError) {
-    this._nats.listen(options, channel, onConnect, onError);
-}
-
-/**
- * Метод устанаваливает заголовки для ответов HTTP сервера
- *
- * @param headers Объект, где свойство - название заголовка, а значение - значение заголовка
- * 
- */
-Server.prototype.setHTTPHeaders = function(headers) {
-    this._http.setHTTPHeaders(headers);
-}
-
-/**
- * Метод включает дополнительный канал для запросов из Nats
- */
-Server.prototype.addNatsChannel = function(channel, callback) {
-    this._nats.addChannel(channel, callback);
-}
-
-Server.prototype._checkParams = function(method, params) {
-    var clearedParams;
-    switch (typeof(this._methods[method].validator)) {
-        case 'object':
-            clearedParams = this._methods[method].validator.check(params);
-            break;
-        case 'function':
-            clearedParams = this._methods[method].validator(params);
-            break;
-        default:
-            clearedParams = params;
-    }
-
-    return clearedParams;
-}
-
-Server.prototype._onRequest = function(content, channel, headers, callback) {
-    jsonrpc.parse(content, (errorResponse, id, method, params)=>{
-        if (errorResponse) {
-            callback(errorResponse);
-            return;
+    createServerHTTP(server) {
+        if (this._server_http) {
+            throw new Error('HTTP server is already created');
         }
 
-        if (!channel && this._credential && (!headers || !headers['x-credential'] || headers['x-credential'] !==  this._credential)) {
-            errorResponse = jsonrpc.create(id, errors.SERVICE_FORBIDDEN);
-            callback(errorResponse);
-            return;
+        this._server_http = new ServerHTTP(server);
+        this._server_http.on('request', (input, channel, headers, response) => {
+            this._onServerRequest(input, channel, headers, response);
+        });
+    }
+
+    async listenHttp(options) {
+        if (!this._server_http) {
+            throw new Error('HTTP server is not created');
         }
+        return await this._server_http.listen(options);
+    }
+
+
+    listenNats(options, callback) {
+
+    }
+
+    on(method, validator, func) {
+        if (!func) {
+            func = validator;
+            validator = (params) => { return params };
+        }
+
+        this._methods.set(method, { validator: validator, func: func });
+    }
+
+    headerAdd(type, value) {
+        if (this._server_http) {
+            this._server_http.headerAdd(type, value);
+        }
+        if (this._server_nats) {
+            this._server_http.headerAdd(type, value);
+        }
+    }
+
+    headerRemove(type) {
+        if (this._server_http) {
+            this._server_http.headerRemove(type);
+        }
+        if (this._server_nats) {
+            this._server_http.headerRemove(type);
+        }
+    }
+
+    _onServerRequest(input, channel, headers, response) {
+        const jprcRequest = new jsonrpc.JsonRPCRequest(input);
+        const jrpcResponse = new jsonrpc.JsonRPCResponse(jprcRequest.id || null);
         
-        if (!this._methods[method]) {
-            errorResponse = jsonrpc.create(id, errors.METHOD_IS_NOT_FOUND);
-            callback(errorResponse);
-            return;
-        }
-        
-        let clearedParams;
-        try {
-            clearedParams = this._checkParams(method, params);
-        } catch(e) {
-            let error = {};
-            Object.assign(error, errors.INVALID_PARAMS, {data: e.message});
-            errorResponse = jsonrpc.create(id, error);
-            callback(errorResponse);
+        if (jprcRequest.error) {
+            jrpcResponse.setError(jprcRequest.error.message);
+            response(jrpcResponse.stringify());
             return;
         }
 
+        if (this._credential && !channel && (!headers || !headers['x-credential'] || headers['x-credential'] !==  this._credential)) {
+            jrpcResponse.setError('SERVICE_FORBIDDEN');
+            response(jrpcResponse.stringify());
+            return;
+        }
+
+        if (!this._methods.has(jprcRequest.method)) {
+            jrpcResponse.setError('METHOD_IS_NOT_FOUND');
+            response(jrpcResponse.stringify());
+            return;
+        }
+
+        const method = this._methods.get(jprcRequest.method)
+
+        let params;
         try {
-            switch(this._methods[method].func.length) {
-                case 1:
-                    this._methods[method].func((error, result)=>{
-                        if (error) {
-                            errorResponse = jsonrpc.create(id, error);
-                            callback(errorResponse);
-                            return;
-                        }
-    
-                        callback(jsonrpc.create(id, undefined, result));
-                    });
-                    break;
-                case 2:
-                    this._methods[method].func(clearedParams, (error, result)=>{
-                        if (error) {
-                            errorResponse = jsonrpc.create(id, error);
-                            callback(errorResponse);
-                            return;
-                        }
-    
-                        callback(jsonrpc.create(id,undefined, result));
-                    });
-                    break;
-                case 3:
-                    this._methods[method].func(clearedParams, channel, (error, result)=>{
-                        if (error) {
-                            errorResponse = jsonrpc.create(id, error);
-                            callback(errorResponse);
-                            return;
-                        }
-    
-                        callback(jsonrpc.create(id, undefined, result));
-                    });
-                    break; 
-                case 4:
-                    this._methods[method].func(clearedParams, channel, headers, (error, result)=>{
-                        if (error) {
-                            errorResponse = jsonrpc.create(id, error);
-                            callback(errorResponse);
-                            return;
-                        }
-    
-                        callback(jsonrpc.create(id, undefined, result));
-                    });
-                    break; 
-                default:
-                    console.log('Error arg length in' + f.name);
-                    errorResponse = jsonrpc.create(id, errors.INTERNAL_ERROR);
-                    callback(errorResponse);
-                    return;
-    
-            }
+            params = method.validator(jprcRequest.params);
         } catch(e) {
             console.log(e);
-            errorResponse = jsonrpc.create(id, errors.INTERNAL_ERROR);
-            callback(errorResponse);
+            jrpcResponse.setError('INVALID_PARAMS', e.message);
+            response(jrpcResponse.stringify());
             return;
         }
-        
-    });
-};
 
-module.exports = Server;
+        try {
+            this._callMethod(method.func, params, channel, headers, (error_message, result) => {
+                if (error_message) {
+                    jrpcResponse.setError(error_message);
+                    response(jrpcResponse.stringify());
+                    return;
+                }
+
+                jrpcResponse.setResult(result);
+                response(jrpcResponse.stringify());
+                return;
+            });
+        } catch (e) {
+            console.log(e);
+            jrpcResponse.setError('INTERNAL_ERROR', e.message);
+            response(jrpcResponse.stringify());
+            return;
+        }
+
+    }
+
+    _callMethod(func, params, channel, headers, callback) {
+        switch(func.length) {
+            case 1:
+                func(callback);
+                break;
+            case 2:
+                func(params, callback);
+                break;
+            case 3:
+                func(params, channel, callback);
+                break;
+            case 4:
+                func(params, channel, headers, callback);
+                break;
+            default:
+                throw new Error('INTERNAL_ERROR');
+        }
+    }
+
+}
+
+module.exports.JSONRPCServer = JsonRPCServer;
+module.exports.jsonRPCErrors = errors.jsonRPCErrorsList;

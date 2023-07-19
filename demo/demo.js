@@ -1,8 +1,10 @@
 // Подключаем модуль
-const JsonRPCServer = require('../src/jsonrpc-server');
+const {JSONRPCServer, jsonRPCErrors} = require('../src/jsonrpc-server');
+
+jsonRPCErrors.setError('CUSTOM_ERROR', 1);
 
 // Создаем экземпляр сервера
-var server = new JsonRPCServer();
+const server = new JSONRPCServer();
 
 // Обработчик на метод Ping
 server.on('Ping', (response) => {
@@ -12,15 +14,12 @@ server.on('Ping', (response) => {
 });
 
 // Валидатор и обработчик на метод Hello, с проверкой параметра
-var validator = function(param) {
+server.on('Hello', (param) =>{
     if (typeof(param) !== 'string') {
         throw new Error('Ожидается строка');
-        return;
     }
     return param;
-}
-
-server.on('Hello', validator, (params, channel, response) => {
+}, (params, channel, response) => {
     let error = null;
     let result = `Hello ${params} on channel ${channel||'HTTP'}!`;
     response(error, result);
@@ -28,15 +27,14 @@ server.on('Hello', validator, (params, channel, response) => {
 
 
 // Возврат ошибки с информацие о канале
-server.on('ItIsNotWork', (params, response)=>{
-    let error = {
-        code: 1,
-        message: 'Custom error'
-    }
-    response(error);
+server.on('ItIsNotWork', (response)=>{
+    response('CUSTOM_ERROR');
 });
 
+// Создаем HTTP server
+server.createServerHTTP();
 
 // Запустим сервер
-server.listenHttp({credential: 'ABCD'});
+server.listenHttp(undefined, (e) => {console.log(e)});
+
 //server.listenNats('nats://127.0.0.1:4222', 'TestChannel');

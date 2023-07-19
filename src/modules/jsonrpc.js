@@ -1,60 +1,56 @@
-const errors = require('./jsonrpc-errors');
+const { jsonRPCErrorsList } = require('./jsonrpc-errors');
 
-module.exports.create = function(id, error, result) {
-    let jrpc = {
-        jsonrpc: "2.0",
-        id: id || null,
+class JsonRPCRequest {
+    constructor(input) {
+        let json = {};
+        try {
+            json = JSON.parse(input);
+        } catch(e) {
+            this.error = jsonRPCErrorsList.getError('PARSE_ERROR');
+            return;
+        }
+
+        if (json.jsonrpc !== '2.0') {
+            this.error = jsonRPCErrorsList.getError('INVALID_REQUEST');
+            this.error.setData('JSONRPC version is not correct');
+            return;
+        }
+
+        if (!json.method) {
+            this.error = jsonRPCErrorsList.getError('INVALID_REQUEST');
+            this.error.setData('Method is not exist in request');
+            return;
+        }
+
+        this.jsonrpc = '2.0'
+        this.id = json.id || null;
+        this.method = json.method;
+        this.params = json.params;
     }
-
-    // Если ошибка - возвращаем, даже если не передан id
-    if (error) {
-        jrpc.error = error;
-        return JSON.stringify(jrpc);
-    }
-
-    // Если не передан id - ничего не возвращаем
-    if (!id) {
-        return '';
-    }
-
-    jrpc.result = result;
-
-    return JSON.stringify(jrpc);
 }
 
-
-module.exports.parse = function(content, callback) {
-    // Если нет тела запроса
-    if (!content) {
-        let error = this.create(null, errors.INVALID_REQUEST);
-        callback(error);
-        return;
-    }
-    
-
-    let json;
-    try {
-        json = JSON.parse(content);
-    } catch(e) {
-        // Если ошибка разбора JSON
-        let error = this.create(null, errors.PARSE_ERROR);
-        callback(error);
-        return;
+class JsonRPCResponse {
+    constructor(id, result) {
+        this.jsonrpc = '2.0'
+        this.id = id || null;
+        this.result = result;
     }
 
-    if (!json.jsonrpc || json.jsonrpc !== '2.0') {
-        // Если нет идентификатора протокола
-        let error = this.create(null, errors.INVALID_REQUEST);
-        callback(error);
-        return;
+    setError(message, data) {
+        this.error = jsonRPCErrorsList.getError(message);
+        this.error.setData(data);
     }
 
-    // Если нет метода
-    if (!json.method) {
-        let error = this.create(null, errors.METHOD_IS_NOT_FOUND);
-        callback(error);
-        return;
+    setResult(result) {
+        this.result = result;
     }
 
-    callback(undefined, json.id, json.method, json.params);
+    stringify() {
+        return JSON.stringify(this);
+    }
 }
+
+module.exports.JsonRPCRequest = JsonRPCRequest;
+module.exports.JsonRPCResponse = JsonRPCResponse;
+
+// callback(undefined, json.id, json.method, json.params);
